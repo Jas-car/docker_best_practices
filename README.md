@@ -24,9 +24,9 @@ Finalmente un fichero *docker compose* para relacionarlos y levantar el escenari
 
 Para nuestro caso necesitaremos una imagen con node y otra con nginx , de modo que debemos elegirlas del repositorio de imágenes DockerHub teniendo en cuenta que estén verificadas:
 
-![alt text](images\nginx_oficial.png)
+![alt text](./images/nginx_oficial.png)
 
-![alt text](images\node_oficial.png)
+![alt text](./images/node_oficial.png)
 
 2. ***Elección de imágenes base lo más ligeras posible*** 
 
@@ -34,14 +34,14 @@ Para ello , debemos elegir imágenes con el sufijo **slim** , y en la medida de 
 
 - Para ejecutar la lógica de las aplicaciones solamente es necesario nodejs:
 
-  ![alt text](images\node_slim.png)
+  ![alt text](./images/node_slim.png)
 
 ```dockerfile
   FROM node:16.16-slim 
 ```
 - Para la función de proxy necesitamos solamente un nginx con el sistema operativo más ligero:
 
-  ![alt text](images\nginx_slim_alpine.png)
+  ![alt text](./images/nginx_slim_alpine.png)
 
 ```dockerfile
   FROM  nginx:alpine3.18-slim
