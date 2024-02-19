@@ -29,7 +29,7 @@ services:
   
   backend:
     #image: nginx-backend
-    image: jascarr/exercise-node-backend:v1 
+    image: jascarr/exercise-node-backend:v1
     build:
       context: ./backend
     deploy:
