@@ -15,8 +15,102 @@ Para saber como desplegar esta aplicación en contenedores se debe conocer su fu
 
 De modo que desplegaremos dos contenedores contenedores docker (uno para cada parte de la aplicación).
 
-Asociaremos cada servicio definido en cada una de las dos partes con una imagen docker. Por tanto,  debemos crear un fichero Dockerfile por para el back y un fichero Dockerfile *multi-stage*(que contendrá la creación de dos imágenes) para el front.  
+Asociaremos cada servicio definido en cada una de las dos partes con una imagen docker. Por tanto,  debemos crear un fichero Dockerfile por para el back y un fichero Dockerfile *multi-stage*(que contendrá la creación de dos imágenes) para el front. 
+
+#### Dockerfile backend
+
+```dockerfile
+FROM node:16.16-slim
+
+WORKDIR /app
+
+COPY ./package.json /app/package.json
+COPY ./package-lock.json /app/package-lock.json
+RUN useradd  usernode && chown -R usernode /app
+RUN npm ci
+
+COPY . .
+USER usernode
+CMD ["node", "server.js"]
+```
+#### Dockerfile frontend
+
+```dockerfile
+#Image node front
+FROM node:16.16-slim as build
+ARG REACT_APP_SERVICES_HOST=/services/m
+WORKDIR /app
+COPY ./package.json /app/package.json
+COPY ./package-lock.json /app/package-lock.json
+RUN useradd  usernode && chown -R usernode /app
+RUN yarn install
+COPY . .
+USER usernode
+RUN yarn build
+
+#Image nginx 
+FROM  nginxinc/nginx-unprivileged:latest
+COPY ./nginx/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/build /usr/share/nginx/html
+```
+
 Finalmente un fichero *docker compose* para relacionarlos y levantar el escenario.
+
+#### Docker compose 
+
+```dockerfile
+version: '3.8'
+
+services:
+  frontend:
+    image: jascarr/exercise-nginx-frontend:v1 
+    build: 
+      context: ./frontend
+      args:
+        - REACT_APP_SERVICES_HOST=/services/m
+    deploy:
+        restart_policy:
+            condition: on-failure
+            delay: 5s
+            max_attempts: 3
+            window: 120s
+        resources:
+            limits:
+              cpus: '0.50'
+              memory: 512M
+            reservations:
+              cpus: '0.25'
+              memory: 128M        
+    ports:
+      - "8000:80"
+    networks: 
+      - frontend
+      - backend
+  
+  backend:
+    image: jascarr/exercise-node-backend:v1 
+    build:
+      context: ./backend
+    deploy:
+        restart_policy:
+            condition: on-failure
+            delay: 5s
+            max_attempts: 3
+            window: 120s    
+        resources:
+            limits:
+              cpus: '0.50'
+              memory: 512M
+            reservations:
+              cpus: '0.25'
+              memory: 128M      
+    networks: 
+      - backend
+
+networks: 
+  frontend:
+  backend:
+```
 
 ## Consideraciones de buenas prácticas 
 
