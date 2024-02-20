@@ -197,63 +197,58 @@ Para nuestro caso necesitaremos una imagen con node y otra con nginx , de modo q
 
 ![alt text](./images/node_oficial.png)
 
-> (*) Adicionalmente , se debe configurar Docker para que solamente interactúe con imágenes 
-> verificadas . Para ello se debe cambiar el valor de la variable  **DOCKER_CONTENT_TRUST** a 1.
-> Windows(Powershell): **$env:DOCKER_CONTENT_TRUST=1**
+> Adicionalmente , se debe configurar Docker para que solamente interactúe con imágenes 
+> verificadas.<br> Para ello se debe cambiar el valor de la variable  **DOCKER_CONTENT_TRUST** a 1.<br>
+> Windows(Powershell): **$env:DOCKER_CONTENT_TRUST=1**<br>
 > Linux: **export DOCKER_CONTENT_TRUST=1**
 
 2. ***Elección de imágenes base lo más ligeras posible*** 
 
-
-
   De esta forma, no solamente es una mejor eficiencia en el uso de recursos destinados al contenedor , sino que además, al reducir el número de paquetes y dependencias , se reducen también el potencial número de vulnerabilidades.
-
 
   El funcionamiento de docker para definir varias imágenes en un mismo Dockerfile(llamado así multi stage), funciona de tal manera que solamente permanece en la imagen final la última imagen definida en Dockerfile , creándose las anteriores de forma temporal , permitiendo usarlas por ejemplo para crear un artefacto resultado de una compilación, sin necesidad de almacenar todo ese software adicional que no será necesario en adelante, reduciendo así la superficie de ataque. 
 
   De manera ordenada de más a menos prioritaria, dependiendo de la naturaleza de nuestra aplicación, debemos crear las imágenes en el Dockerfile en el siguiente orden:
 
-    1. ***Imágenes vacías(scratch)***
+2.1 ***Imágenes vacías(scratch)***
 
     Son imágenes sin ningún tipo de software adicional. Por ejemplo en el caso de nuestro Dockerfile *frontend*, la imagen final será muy poco pesada ya que la tercera y última imagen está formada por una imagen vacía:
 
-    ```dockerfile
-      FROM scratch
-    ```
-    Donde posteriormente copiamos todo lo necesario generado en las dos imágenes anteriores.
+  ```dockerfile
+    FROM scratch
+  ```
+  Donde posteriormente copiamos todo lo necesario generado en las dos imágenes anteriores.
 
-    2.  ***Imágenes distroless***
+2.2  ***Imágenes distroless***
 
-    Son aquellas imágenes que serán usadas en entornos de producción, especialmente en pods en kubernetes, ya que no contienen muchos de los paquetes que se encuentran incluso en los sistemas operativos más ligeros, como /bin/sh o /bin/bash. Esto se traduce en que no contienen funcionalidades como la execución de una shell. Además tampoco cuentan para ejecutarse por defecto con un usuario con privilegios de administrador. Esto las hace muy eficientes y seguras.
-    Por ejemplo para la imagen final en el backend , se utiliza una imagen de esta clase:
+  Son aquellas imágenes que serán usadas en entornos de producción, especialmente en pods en kubernetes, ya que no contienen muchos de los paquetes que se encuentran incluso en los sistemas operativos más ligeros, como /bin/sh o /bin/bash. Esto se traduce en que no contienen funcionalidades como la execución de una shell. Además tampoco cuentan para ejecutarse por defecto con un usuario con privilegios de administrador. Esto las hace muy eficientes y seguras.
+  Por ejemplo para la imagen final en el backend , se utiliza una imagen de esta clase:
 
-    ```dockerfile
-      FROM gcr.io/distroless/nodejs
-    ```
+  ```dockerfile
+    FROM gcr.io/distroless/nodejs
+  ```
 
-    3.  ***Imágenes alpine-slim***
+  2.3  ***Imágenes alpine-slim***
 
-    En aquellos entornos de pruebas donde debamos interactuar dentro del contenedor o porque nuespara la lógica de nuestra aplicación no haya disponible una imagen de los tipos anteriores, debemos elegir imágenes con el sufijo **slim** , y en la medida de lo posible sistema operativo **alpine**. 
+  En aquellos entornos de pruebas donde debamos interactuar dentro del contenedor o porque nuespara la lógica de nuestra aplicación no haya disponible una imagen de los tipos anteriores, debemos elegir imágenes con el sufijo **slim** , y en la medida de lo posible sistema operativo **alpine**. 
 
-    Posteriormente , para entornos productivos podríamos eliminar las funciones como /bin/bash o ejecutar las imágenes con un usuario y grupo creado otrogando los permisos imprescindibles.
+  Posteriormente , para entornos productivos podríamos eliminar las funciones como /bin/bash o ejecutar las imágenes con un usuario y grupo creado otrogando los permisos imprescindibles.
     
+   - Para ejecutar la lógica de las aplicaciones solamente es necesario nodejs:
 
+     ![alt text](./images/node_slim.png)
 
-      - Para ejecutar la lógica de las aplicaciones solamente es necesario nodejs:
+   ```dockerfile
+     FROM node:16.16-slim 
+   ```
 
-        ![alt text](./images/node_slim.png)
+   - Para la función de proxy necesitamos solamente un nginx con el sistema operativo más ligero:
 
-      ```dockerfile
-        FROM node:16.16-slim 
-      ```
+     ![alt text](./images/nginx_slim_alpine.png)
 
-      - Para la función de proxy necesitamos solamente un nginx con el sistema operativo más ligero:
-
-        ![alt text](./images/nginx_slim_alpine.png)
-
-      ```dockerfile
-        FROM  nginx:alpine3.18-slim
-      ```
+   ```dockerfile
+     FROM  nginx:alpine3.18-slim
+   ```
 
 
 3. ***Principio del menor privilegio posible***  
