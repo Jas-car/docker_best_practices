@@ -1,22 +1,21 @@
-# Contanerización de una aplicación segura en docker
+# Containerizing a secure application in docker
 
-Con esta aplicación de ejemplo se revisará y resaltarán algunos puntos importantes para desplegarla en Docker resaltando la seguridad.
+This example application will review and highlight some important points for deploying it in Docker, highlighting security.
 
-## Funcionamiento de la aplicación
+## Application operation
 
-Para saber como desplegar esta aplicación en contenedores se debe conocer su funcionamiento . Consta de dos partes:
+To know how to deploy this application in containers, you must know how it works. It consists of two parts:
 
-- Parte *back* ,formada por un  servicio encargado de  ejecutar una API muy básica definida mediante **node**.
+- *backend* , formed by a service in charge of executing a very basic API defined through **node**.
 
-- Parte *front* , que a su vez está formada por dos servicios:
+- *frontend* , which in turn is made up of two services:
  
-   - La parte de entrada a la aplicación, que será un **nginx** para redirigir peticiones y el punto de entrada a la aplicación. 
-   - La parte lógica del front. que se comunica con el back  usando **node**.
+   - The entry part to the application, which will be an **nginx** to redirect requests and the entry point to the application.
+   - The logical part of the front. which communicates with the back using **node**.
 
-De modo que desplegaremos dos contenedores contenedores docker (uno para cada parte de la aplicación).
+So we will deploy two docker containers (one for each part of the application).
 
-Asociaremos cada servicio definido en cada una de las dos partes con una imagen docker. Por tanto,  debemos crear un fichero Dockerfile  *multi-stage* para el back y un fichero Dockerfile *multi-stage* para el front. 
-
+We will associate each service defined in each of the two parts with a docker image. Therefore, we must create a *multi-stage* Dockerfile for the backend and a *multi-stage* Dockerfile for the front.
 
 #### Dockerfile backend
 
@@ -129,7 +128,7 @@ USER nonroot
 CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
 ```
 
-Finalmente un fichero *docker compose* para relacionarlos y levantar el escenario.
+Finally a *docker compose* file to relate them and build the scenario.
 
 #### Docker compose 
 
@@ -187,126 +186,124 @@ networks:
   backend:
 ```
 
-## Consideraciones de buenas prácticas 
+## Good Practice Considerations
 
-1. ***Elección de imágenes base oficiales***
+1. ***Choice of official base images***
 
-Para nuestro caso necesitaremos una imagen con node y otra con nginx , de modo que debemos elegirlas del repositorio de imágenes DockerHub teniendo en cuenta que estén verificadas:
+For our case we will need an image with node and another with nginx, so we must choose them from the DockerHub image repository taking into account that they are verified:
 
 ![alt text](./images/nginx_oficial.png)
 
 ![alt text](./images/node_oficial.png)
 
-> Adicionalmente , se debe configurar Docker para que solamente interactúe con imágenes 
-> verificadas.<br> Para ello se debe cambiar el valor de la variable  **DOCKER_CONTENT_TRUST** a 1.<br>
+> Additionally, Docker must be configured to only interact with images
+> verified.<br> To do this, the value of the variable **DOCKER_CONTENT_TRUST** must be changed to 1.<br>
 > Windows(Powershell): **$env:DOCKER_CONTENT_TRUST=1**<br>
 > Linux: **export DOCKER_CONTENT_TRUST=1**
 
-2. ***Elección de imágenes base lo más ligeras posible*** 
+2. ***Choosing base images that are as light as possible***
+        
+   In this way, not only is there better efficiency in the use of resources allocated to the container, but also, by reducing the number of packages and dependencies, the potential number of vulnerabilities is also reduced.
 
-  De esta forma, no solamente es una mejor eficiencia en el uso de recursos destinados al contenedor , sino que además, al reducir el número de paquetes y dependencias , se reducen también el potencial número de vulnerabilidades.
+   The way docker works to define several images in the same Dockerfile (called multi stage), works in such a way that only the last image defined in Dockerfile remains in the final image, creating the previous ones temporarily, allowing them to be used, for example, to create an artifact resulting from a compilation, without the need to store all that additional software that will not be needed in the future, thus reducing the attack surface.
 
-  El funcionamiento de docker para definir varias imágenes en un mismo Dockerfile(llamado así multi stage), funciona de tal manera que solamente permanece en la imagen final la última imagen definida en Dockerfile , creándose las anteriores de forma temporal , permitiendo usarlas por ejemplo para crear un artefacto resultado de una compilación, sin necesidad de almacenar todo ese software adicional que no será necesario en adelante, reduciendo así la superficie de ataque. 
+   In order from highest to lowest priority, depending on the nature of our application, we must create the images in the Dockerfile in the following order:
 
-  De manera ordenada de más a menos prioritaria, dependiendo de la naturaleza de nuestra aplicación, debemos crear las imágenes en el Dockerfile en el siguiente orden:
+   1. ***Empty images (scratch)***
 
-2.1 ***Imágenes vacías(scratch)***
+   They are images without any additional software. For example, in the case of our *frontend* Dockerfile, the final image will be very light since the third and last image is made up of an empty image:
 
-    Son imágenes sin ningún tipo de software adicional. Por ejemplo en el caso de nuestro Dockerfile *frontend*, la imagen final será muy poco pesada ya que la tercera y última imagen está formada por una imagen vacía:
+    ```dockerfile
+      FROM scratch
+    ```
+    Where we later copy everything necessary generated in the two previous images.
 
-  ```dockerfile
-    FROM scratch
-  ```
-  Donde posteriormente copiamos todo lo necesario generado en las dos imágenes anteriores.
+   2. ***Distroless images***
 
-2.2  ***Imágenes distroless***
+   They are those images that will be used in production environments, especially in pods in kubernetes, since they do not contain many of the packages found in even the most lightweight operating systems, such as /bin/sh or /bin/bash. This means that they do not contain functionalities such as executing a shell. Furthermore, they do not count to run by default with a user with administrator privileges. This makes them very efficient and safe.
+   For example for the final image in the backend, an image of this class is used:
 
-  Son aquellas imágenes que serán usadas en entornos de producción, especialmente en pods en kubernetes, ya que no contienen muchos de los paquetes que se encuentran incluso en los sistemas operativos más ligeros, como /bin/sh o /bin/bash. Esto se traduce en que no contienen funcionalidades como la execución de una shell. Además tampoco cuentan para ejecutarse por defecto con un usuario con privilegios de administrador. Esto las hace muy eficientes y seguras.
-  Por ejemplo para la imagen final en el backend , se utiliza una imagen de esta clase:
+   ```dockerfile
+     FROM gcr.io/distroless/nodejs
+   ```
 
-  ```dockerfile
-    FROM gcr.io/distroless/nodejs
-  ```
+   3. ***Alpine-slim images***
 
-  2.3  ***Imágenes alpine-slim***
+   In those test environments where we must interact within the container or because an image of the previous types is not available for the logic of our application, we must choose images with the **slim** suffix, and as far as possible operating system **alpine**.
 
-  En aquellos entornos de pruebas donde debamos interactuar dentro del contenedor o porque nuespara la lógica de nuestra aplicación no haya disponible una imagen de los tipos anteriores, debemos elegir imágenes con el sufijo **slim** , y en la medida de lo posible sistema operativo **alpine**. 
-
-  Posteriormente , para entornos productivos podríamos eliminar las funciones como /bin/bash o ejecutar las imágenes con un usuario y grupo creado otrogando los permisos imprescindibles.
+   Later, for productive environments we could eliminate the decshell functions such as /bin/bash or run the images with a user and group created by granting the essential permissions.
     
-   - Para ejecutar la lógica de las aplicaciones solamente es necesario nodejs:
+    - To execute the application logic you would only need nodejs:
 
      ![alt text](./images/node_slim.png)
 
-   ```dockerfile
-     FROM node:16.16-slim 
-   ```
+    ```dockerfile
+      FROM node:16.16-slim
+    ```
 
-   - Para la función de proxy necesitamos solamente un nginx con el sistema operativo más ligero:
+    - For the proxy function we would only need an nginx with the lightest operating system:
 
      ![alt text](./images/nginx_slim_alpine.png)
 
-   ```dockerfile
-     FROM  nginx:alpine3.18-slim
-   ```
+    ```dockerfile
+      FROM nginx:alpine3.18-slim
+    ```
+3. ***Principle of least possible privilege***
 
-
-3. ***Principio del menor privilegio posible***  
-
-Para evitar potenciales ataques , debemos ejecutar los contenedores sin usuario root(que es el usuario por defecto para los contenedores si no se explicita ninguno).
+To avoid potential attacks, we must run the containers without the root user (which is the default user for the containers if none is specified).
 
 
 
-> En linux  , los permisos de los directorios y ficheros se gestionan de más a menos prioritarios de  
-> la siguiente manera:
->> - propietario del fichero o directorio
->> - grupo al que pertenece el propietario del fichero o directorio
->> - resto de usuarios
+> In Linux, the permissions of directories and files are managed from highest to lowest priority.
+> the following way:
+>> - owner of the file or directory
+>> - group to which the owner of the file or directory belongs
+>> - rest of users
 >
-> Además a cada usuario y al grupo al que pertenece se le asocia un identificador:
->> - uid: identificador numérico de usuario. Por convención comienzan a partir de 1000.
->> - gid: identificador numérico de grupo.Por convención comienzan a partir de  1000.
+> In addition, an identifier is associated with each user and the group to which they belong:
+>> - uid: numeric user identifier. By convention they start at 1000.
+>> - gid: numerical group identifier. By convention they start at 1000.
 >
-> La información de los usuarios y sus grupos se encuentra alojada en los ficheros */etc/passwd* y 
-> *etc/group*. Por tanto para mantener los permisos de una imagen a otra debemos copiar estos   
-> ficheros como hacemos en el dockerfile frontend , durante la creación de la última imagen:
+> The information about users and their groups is hosted in the files */etc/passwd* and
+> *etc/group*. Therefore, to maintain the permissions from one image to another we must copy these
+> files as we do in the frontend dockerfile, during the creation of the last image:
 >
 > ```dockerfile
->  COPY --from=builder /etc/passwd /etc/passwd
->  COPY --from=builder /etc/group /etc/group
+> COPY --from=builder /etc/passwd /etc/passwd
+> COPY --from=builder /etc/group /etc/group
 > ```
 
-Teniendo esto en cuenta, para mantener el control de los mínimos permisos que necesitan los usuarios, se debe crear un usuario y un grupo  para ese usuario al que le debemos asignar el uid y el gid respectivamente. Además solamente debe tener permisos para las carpetas y ficheros imprescindibles, tal  y como se realiza en la primera imagen node definida en el Dockerfile backend:
+Taking this into account, to maintain control of the minimum permissions that users need, a user and a group must be created for that user to which we must assign the uid and gid respectively. Additionally, you should only have permissions for the essential folders and files, as is done in the first node image defined in the backend Dockerfile:
 
 ```dockerfile
-RUN groupadd -g 1002  nodegroup && useradd -u 1002 -g 1002 usernode \ 
+RUN groupadd -g 1002 nodegroup && useradd -u 1002 -g 1002 usernode \
 && chown -R usernode /app && chmod 550 /app && chmod 770 /app/node_modules
 USER usernode
-``` 
-4. ***Limitación de los recursos a usar por el contenedor***  
+```
+4. ***Limitation of resources to be used by the container***
 
-Por defecto , los contenedores que se ejecutan sobre el host no están limitados en cuanto al uso de recursos a utilizar. Se debe evitar esto comportamiento para garantizar la disponibilidad del host donde se ejecutan los contenedores. Para ello, a partir de las versiones 3 de docker compose se debe utilizar la directiva resources dentro de deploy , donde limitamos el uso máximo a utlicar de memoria y de cpu :
+By default, containers running on the host are not limited in terms of resource usage. This behavior should be avoided to ensure the availability of the host where the containers are running. To do this, starting with versions 3 of docker compose, you must use the resources directive within deploy , where we limit the maximum use to using memory and cpu:
 
 ```dockerfile
     resources:
         limits:
-            cpus: '0.50'
+            CPU: '0.50'
             memory: 512M
         reservations:
-            cpus: '0.25'
-            memory: 128M  
+            CPU: '0.25'
+            memory: 128M
 ```
-(*) Verificamos con el comando *docker stats*  que efectivamente están limitados los recursos de los contenedores levantados:
+(*) We verify with the *docker stats* command that the resources of the raised containers are indeed limited:
+
 
 |CONTAINER ID |  NAME | CPU %   |  MEM USAGE / LIMIT |  MEM %  |   NET I/O |   BLOCK I/O  | PIDS |
 |-------------|---------------|--------|-------------|-----|------------|-----------|--------|
 |23d75a5958aa |  docker-nginx-frontend-1 |  0.00% |    9.598MiB / 512MiB |    0.94% | 2.53kB / 0B |  0B / 0B   |  13 |
 |ff0b09587fe9 |  docker-nginx-backend-1 |   0.00% |    26.31MiB / 512MiB |  5.14% |    1.32kB / 0B |  0B / 0B   |  7 |
 
+5. ***Opening of only essential ports***
 
-5. ***Apertura de solamante puertos imprescindibles***  
-
-Por seguridad, los puertos de los contenedores están cerrados , salvo que se indique lo contrario al momento de su creación. De modo que solo se deben abrir aquellos puertos que expresamente vayan a ser utilizados. En éste caso solo es necesario habilitar el puerto 8000 para acceder desde el host  al servicio del proxy. Para indicar los puertos a abrir,lo indicamos en el fichero docker compose en la directiva ports  con la siguiente nomenclatura:
+For security, container ports are closed, unless otherwise indicated at the time of creation. So only those ports that are expressly going to be used should be opened. In this case, it is only necessary to enable port 8000 to access the proxy service from the host. To indicate the ports to open, we indicate them in the docker compose file in the ports directive with the following nomenclature:
 
 > **"NumPortHost:NumPortContainer"**
 
@@ -315,67 +312,74 @@ Por seguridad, los puertos de los contenedores están cerrados , salvo que se in
       - "8000:80"
 ```
 
-(*) Todos los contenedores definidos en el mismo docker-compose tendrán visibilidad y podrán comunicarse entre ellos. En este caso hemos definido dos subredes: backend y frontend.De no hacerlo, se crearúa una subred automática donde se incluirían los dos contenedores. Sin embargo , es preferible tener el control de las subredes por si fuera necesario  particularizar que  contenedor debe ir a cada subred.
+> All containers defined in the same docker-compose will have visibility and can communicate with each other. In this case we have defined two subnets: backend and frontend. If not, an automatic subnet will be created where the two containers would be included. However, it is preferable to have control of the subnets in case it is necessary to specify which container should go to each subnet.
 
-```dockerfile
-  networks: 
-    frontend:
-    backend:
-```
 
-6. ***Mejorar la disponibilidad del contenedor***  
+6. ***Improve container availability***
 
-En la medida de lo posible , se debe indicar la política a efectuar por docker en caso de fallo del contenedor. En este caso se indica que siempre se vuelvan a levantar en caso de fallo hasta un máximo de tres intentos en el docker compose:
+As far as possible, the policy to be implemented by docker in case of container failure should be indicated. In this case, it is indicated that they should always be raised again in case of failure up to a maximum of three attempts in docker compose:
 
 ```dockerfile
         restart_policy:
             condition: on-failure
             delay: 5s
             max_attempts: 3
-            window: 120s   
+            window: 120s
 ```
-Además en el Dockerfile se puede añadir la directiva  [*HEALTHCHECK*](https://docs.docker.com/engine/reference/builder/#healthcheck), para monitorizar el estado del contenedor y ejecutar peticiones al endpoint del contenedor para asegurarnos que funciona correctamente:
+Additionally, in the Dockerfile you can add the [*HEALTHCHECK*](https://docs.docker.com/engine/reference/builder/#healthcheck) directive, to monitor the status of the container and execute requests to the container endpoint to ensure that works correctly:
 
 ```dockerfile
     HEALTHCHECK --interval=5m --timeout=3s \
-    CMD curl -f http://localhost || exit 1 
+    CMD curl -f http://localhost || exit 1
 ```
 
-O bien añadirlo al docker compose:
+Or add it to docker compose:
 
 ```dockerfile
     healthcheck:
       test: curl --fail http://localhost || exit 1
       interval: 5s
       timeout: 3s
-      retries: 1
-      start_period: 2s  
+      returns: 1
+      start_period: 2s
 ```
 
+7. ***Use hash to select docker image version***
 
-## Iniciar la aplicación
-
-### Mediante únicamente el fichero  docker compose
-
-Situándonos en el directorio donde se encuentre el *docker-compose.yml* ejecutar lo siguiente:
+To ensure that we get the version of the image we want, instead of referencing it using the image tag, we should use the id *digest* , which is a SHA256 hash of the docker image. For example, for the node image to use instead of referencing it by its version identified by the tag:
 
 ```dockerfile
-   docker-compose up -d --no-build 
+  FROM node:16.16-slim
+```
+We must do it with its *digest* identifier, which will always be unique for a given version of an image:
+
+```dockerfile
+  FROM node@sha256:e9dbce470d22c34e5cc91e305f5ad3fd14b3f02e36fd8a7746e3e5a9e4de4655
 ```
 
-Donde el valor de cada parámetro:
+## Start the application
 
- *-d* (detached mode) : Ejecutar en modo background. Si se quieren ver los logs del servidor arrancando por consola se debe omitir.
+### Using only the docker compose file
 
-*--no-build* : Evitar la directiva *build* del docker compose ,ya que en este caso nos descargamos las imágenes de docker hub sin necesidad de construirlas.
-
-### Mediante todo el repositorio
-
-Para ello nos debemos descargar el proyecto de git:
-
-Situándonos en la base del proyecto  ejecutar lo siguiente:
+Placing ourselves in the directory where *docker-compose.yml* is located, execute the following:
 
 ```dockerfile
-   docker-compose up -d 
+   docker-compose up -d --no-build
+```
+
+Where the value of each parameter:
+
+ *-d* (detached mode) : Run in background mode. If you want to see the server logs starting through the console, you should omit it.
+
+*--no-build*: Avoid the *build* directive of docker compose, since in this case we download the docker hub images without having to build them.
+
+### Through the entire repository
+
+To do this we must download the git project:
+
+Placing ourselves at the base of the project, execute the following:
+
+```dockerfile
+   docker-compose up -d
 ```
 
