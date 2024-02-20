@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   frontend:
-    #image: nginx-frontend
-    image: jascarr/exercise-nginx-frontend:v1 
+    image: jascarr/exercise-nginx-frontend:distroless
     build: 
       context: ./frontend
       args:
@@ -20,7 +19,7 @@ services:
               memory: 512M
             reservations:
               cpus: '0.25'
-              memory: 128M        
+              memory: 128M                   
     ports:
       - "8000:80"
     networks: 
@@ -28,8 +27,7 @@ services:
       - backend
   
   backend:
-    #image: nginx-backend
-    image: jascarr/exercise-node-backend:v1
+    image: jascarr/exercise-node-backend:distroless
     build:
       context: ./backend
     deploy:

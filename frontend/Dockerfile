@@ -77,6 +77,14 @@ RUN --mount=type=bind,from=builder,target=/mount ["/mount/bin/ln", "-sf", "/dev/
 
 EXPOSE 8000
 
+# import curl from current repository image
+COPY --from=ghcr.io/tarampampam/curl:8.6.0 /bin/curl /bin/curl
+
 USER nonroot
 
-CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
+# Docs: <https://docs.docker.com/engine/reference/builder/#healthcheck>
+HEALTHCHECK --interval=5s --timeout=2s --retries=2 --start-period=2s CMD [ \
+    "curl", "--fail", "http://127.0.0.1:8000/" \
+]
+
+CMD  ["/usr/sbin/nginx", "-g", "daemon off;"]
