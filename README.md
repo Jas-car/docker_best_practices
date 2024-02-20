@@ -231,7 +231,7 @@ For our case we will need an image with node and another with nginx, so we must 
 
    In those test environments where we must interact within the container or because an image of the previous types is not available for the logic of our application, we must choose images with the **slim** suffix, and as far as possible operating system **alpine**.
 
-   Later, for productive environments we could eliminate the decshell functions such as /bin/bash or run the images with a user and group created by granting the essential permissions.
+   Later, for productive environments we could eliminate the shell functions such as /bin/bash or run the images with a user and group created by granting the essential permissions.
     
     - To execute the application logic you would only need nodejs:
 
@@ -248,13 +248,13 @@ For our case we will need an image with node and another with nginx, so we must 
     ```dockerfile
       FROM nginx:alpine3.18-slim
     ```
-3. ***Principle of least possible privilege***
+3. ***Minimum privilege principle***
 
-To avoid potential attacks, we must run the containers without the root user (which is the default user for the containers if none is specified).
+To avoid potential attacks, we must run the containers without the root user,which is the default user for the containers if none is specified.
 
 
 
-> In Linux, the permissions of directories and files are managed from highest to lowest priority.
+> In Linux, the permissions of directories and files are managed from highest to lowest priority in
 > the following way:
 >> - owner of the file or directory
 >> - group to which the owner of the file or directory belongs
