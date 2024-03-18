@@ -5,11 +5,11 @@ run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
 on: 
 #[push]
 #Trigger the workflow for push events but only for the main branch
-# push: 
-#    branches[main]
+  push: 
+    branches[main]
 
 #Allows you to run this workflow manually from the Actions tab
-    workflow_dispatch: 
+  workflow_dispatch: 
 
 jobs:
   Explore-GitHub-Actions:
