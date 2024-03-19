@@ -32,4 +32,10 @@ jobs:
           java -version
       - name: Test maven version
         run: |
-          mvn -version          
+          mvn -version      
+      - name: Create executable jar
+        run: |
+          mvn clean package
+      - name: Deploy app
+        run: |
+          java -jar .\target\amenity-reservation-system-0.0.1-SNAPSHOT.jar        
