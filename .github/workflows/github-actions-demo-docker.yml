@@ -24,6 +24,12 @@ jobs:
       - name: List files in the repository
         run: |
           ls ${{ github.workspace }}
-      - name: Build docker
+      #- name: Build docker
+      #  run: |
+      #     docker build  -f backend/Dockerfile -t node/runner backend   
+      - name: Check java version
         run: |
-           docker build  -f backend/Dockerfile -t node/runner backend   
+          java -version
+      - name: Test maven version
+        run: |
+          mvn -version          
